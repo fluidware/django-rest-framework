@@ -5,15 +5,14 @@ from rest_framework import serializers
 
 
 class AuthTokenSerializer(serializers.Serializer):
-    username = serializers.CharField()
+    email = serializers.CharField()
     password = serializers.CharField()
 
     def validate(self, attrs):
-        username = attrs.get('username')
+        email = attrs.get('email')
         password = attrs.get('password')
-
-        if username and password:
-            user = authenticate(username=username, password=password)
+        if email and password:
+            user = authenticate(email=email, password=password)
 
             if user:
                 if not user.is_active:

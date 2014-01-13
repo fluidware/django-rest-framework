@@ -11,7 +11,7 @@ from django.db import models
 AUTH_USER_MODEL = getattr(settings, 'AUTH_USER_MODEL', 'auth.User')
 
 
-class Token(models.Model):
+class APIKey(models.Model):
     """
     The default authorization token model.
     """
@@ -30,7 +30,7 @@ class Token(models.Model):
     def save(self, *args, **kwargs):
         if not self.key:
             self.key = self.generate_key()
-        return super(Token, self).save(*args, **kwargs)
+        return super(APIKey, self).save(*args, **kwargs)
 
     def generate_key(self):
         return binascii.hexlify(os.urandom(20)).decode()

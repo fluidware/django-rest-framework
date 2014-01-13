@@ -11,7 +11,7 @@ from django.conf import settings
 from rest_framework import exceptions, HTTP_HEADER_ENCODING
 from rest_framework.compat import oauth, oauth_provider, oauth_provider_store
 from rest_framework.compat import oauth2_provider, provider_now, check_nonce
-from rest_framework.authtoken.models import Token
+from rest_framework.authtoken.models import APIKey
 
 
 def get_authorization_header(request):
@@ -132,9 +132,9 @@ class SessionAuthentication(BaseAuthentication):
             raise exceptions.AuthenticationFailed('CSRF Failed: %s' % reason)
 
 
-class TokenAuthentication(BaseAuthentication):
+class APIKeyAuthentication(BaseAuthentication):
     """
-    Simple token based authentication.
+    Simple API Key based authentication.
 
     Clients should authenticate by passing the token key in the "Authorization"
     HTTP header, prepended with the string "Token ".  For example:
@@ -142,9 +142,9 @@ class TokenAuthentication(BaseAuthentication):
         Authorization: Token 401f7ac837da42b97f613d789819ff93537bee6a
     """
 
-    model = Token
+    model = APIKey
     """
-    A custom token model may be used, but must have the following properties.
+    A custom APIKey model may be used, but must have the following properties.
 
     * key -- The string identifying the token
     * user -- The user to which the token belongs
@@ -153,31 +153,33 @@ class TokenAuthentication(BaseAuthentication):
     def authenticate(self, request):
         auth = get_authorization_header(request).split()
 
-        if not auth or auth[0].lower() != b'token':
+        if not auth or auth[0].lower() != b'apikey':
             return None
 
         if len(auth) == 1:
-            msg = 'Invalid token header. No credentials provided.'
+            msg = 'Invalid API key header. No credentials provided.'
             raise exceptions.AuthenticationFailed(msg)
         elif len(auth) > 2:
-            msg = 'Invalid token header. Token string should not contain spaces.'
+            msg = 'Invalid API key header. API key string should not contain spaces.'
             raise exceptions.AuthenticationFailed(msg)
+        username, api_key = auth[1].partition(':')
+        return self.authenticate_credentials(username, api_key)
 
-        return self.authenticate_credentials(auth[1])
-
-    def authenticate_credentials(self, key):
+    def authenticate_credentials(self, username, api_key):
         try:
-            token = self.model.objects.get(key=key)
+            apikey = self.model.objects.get(key=api_key)
+            if apikey.user.username != username:
+                return exceptions
         except self.model.DoesNotExist:
-            raise exceptions.AuthenticationFailed('Invalid token')
+            raise exceptions.AuthenticationFailed('Invalid API key')
 
-        if not token.user.is_active:
+        if not apikey.user.is_active:
             raise exceptions.AuthenticationFailed('User inactive or deleted')
 
-        return (token.user, token)
+        return (apikey.user, apikey)
 
     def authenticate_header(self, request):
-        return 'Token'
+        return 'APIKey'
 
 
 class OAuthAuthentication(BaseAuthentication):
