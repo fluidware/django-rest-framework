@@ -19,6 +19,7 @@ class AuthTokenSerializer(serializers.Serializer):
                     msg = _('User account is disabled.')
                     raise serializers.ValidationError(msg)
                 attrs['user'] = user
+                attrs['email'] = email
                 return attrs
             else:
                 msg = _('Unable to log in with provided credentials.')
