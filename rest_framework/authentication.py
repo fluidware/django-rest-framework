@@ -160,6 +160,7 @@ class APIKeyAuthentication(BaseAuthentication):
     """
 
     def authenticate(self, request):
+        # import ipdb; ipdb.set_trace()
         auth = get_authorization_header(request).split()
 
         if not auth or auth[0].lower() != b'apikey':
@@ -171,7 +172,7 @@ class APIKeyAuthentication(BaseAuthentication):
         elif len(auth) > 2:
             msg = 'Invalid API key header. API key string should not contain spaces.'
             raise exceptions.AuthenticationFailed(msg)
-        username, api_key = auth[1].split(':')
+        username, api_key = auth[1].split('@')
         return self.authenticate_credentials(username, api_key)
 
     def authenticate_credentials(self, username, api_key):
