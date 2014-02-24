@@ -172,7 +172,14 @@ class APIKeyAuthentication(BaseAuthentication):
         elif len(auth) > 2:
             msg = 'Invalid API key header. API key string should not contain spaces.'
             raise exceptions.AuthenticationFailed(msg)
-        username, api_key = auth[1].split('@')
+
+        try:
+            auth_parts = base64.b64decode(auth[1]).decode(HTTP_HEADER_ENCODING)
+        except (TypeError, UnicodeDecodeError):
+            msg = 'Invalid apikey header. Credentials not correctly base64 encoded'
+            raise exceptions.AuthenticationFailed(msg)
+
+        username, api_key = auth_parts.split(':')
         return self.authenticate_credentials(username, api_key)
 
     def authenticate_credentials(self, username, api_key):
