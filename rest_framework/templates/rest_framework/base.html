@@ -113,7 +113,8 @@
                         {% csrf_token %}
                         <input type="hidden" name="{{ api_settings.FORM_METHOD_OVERRIDE }}" value="DELETE" />
                         <button class="btn btn-danger js-tooltip"
-                                title="Make a DELETE request on the {{ name }} resource">DELETE</button>
+                                title="Make a DELETE request on the {{ name }} resource"
+                                onclick="return confirm('You are about to delete the resource. Do you want to proceed?');">DELETE</button>
                     </form>
                 {% endif %}
 
