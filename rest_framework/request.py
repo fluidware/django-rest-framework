@@ -10,7 +10,6 @@ The wrapped request then offers a richer API, in particular :
 """
 from __future__ import unicode_literals
 from django.conf import settings
-from django.contrib.auth.models import User
 from django.http import QueryDict
 from django.http.multipartparser import parse_header
 from django.utils.datastructures import MultiValueDict

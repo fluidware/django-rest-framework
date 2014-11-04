@@ -13,15 +13,12 @@ from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
 from django.core.exceptions import ImproperlyConfigured
 from django.middleware.csrf import CsrfViewMiddleware
-from django.conf import settings
 from django.shortcuts import get_object_or_404
 
-from rest_framework import jwt
 from rest_framework.authtoken.models import APIKey
 from rest_framework import exceptions, HTTP_HEADER_ENCODING
 from rest_framework.compat import oauth, oauth_provider, oauth_provider_store
 from rest_framework.compat import oauth2_provider, provider_now, check_nonce
-
 
 
 def get_authorization_header(request):
@@ -41,6 +38,7 @@ class CSRFCheck(CsrfViewMiddleware):
     def _reject(self, request, reason):
         # Return the failure reason instead of an HttpResponse
         return reason
+
 
 class BaseAuthentication(object):
     """
@@ -204,7 +202,7 @@ class JWTAuthentication(BaseAuthentication):
     iat_skew = timedelta()
 
     def authenticate(self, request):
-        auth = get_authorization_header(request).split(':',1)
+        auth = get_authorization_header(request).split(':', 1)
 
         if not auth or auth[0].lower() != b'jwt':
             return None
@@ -236,19 +234,19 @@ class JWTAuthentication(BaseAuthentication):
                 msg = 'Invalid JSON token. JWT is not yet valid.'
                 raise exceptions.AuthenticationFailed(msg)
 
-            if claims.has_key('exp') and claims['exp'] <= now:
+            if 'exp' in claims and claims['exp'] <= now:
                 msg = 'Invalid JSON token. JWT token is expired.'
                 raise exceptions.AuthenticationFailed(msg)
 
             user = None
-            if claims.has_key('user_id'):
+            if 'user_id' in claims:
                 user = get_object_or_404(User, pk=claims['user_id'])
 
             return (user, claims)
 
-
     def authenticate_header(self, request):
         return "JWT"
+
 
 class OAuthAuthentication(BaseAuthentication):
     """

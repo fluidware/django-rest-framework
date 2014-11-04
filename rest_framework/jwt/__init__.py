@@ -9,8 +9,8 @@ from itsdangerous import URLSafeSerializer
 
 SECRET_KEY = settings.SECRET_KEY
 
-def generate_jwt(claims, lifetime=None, expires=None,
-                not_before=None):
+
+def generate_jwt(claims, lifetime=None, expires=None, not_before=None):
     """
     Generate a JSON Web Token.
 
@@ -32,13 +32,6 @@ def generate_jwt(claims, lifetime=None, expires=None,
     elif expires:
         claims['exp'] = timegm(expires.utctimetuple())
 
-
-
     signer = URLSafeSerializer(SECRET_KEY)
 
     return signer.dumps(claims)
-
-
-
-
-

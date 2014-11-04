@@ -13,11 +13,12 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.CreateModel(
-            name='Token',
+            name='APIKey',
             fields=[
                 ('key', models.CharField(primary_key=True, serialize=False, max_length=40)),
                 ('created', models.DateTimeField(auto_now_add=True)),
-                ('user', models.OneToOneField(to=settings.AUTH_USER_MODEL, related_name='auth_token')),
+                ('user', models.OneToOneField(to=settings.AUTH_USER_MODEL, related_name='auth_apikey')),
+                ('email', models.CharField(null=True, blank=True, max_length=255)),
             ],
             options={
             },
