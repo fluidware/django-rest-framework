@@ -13,13 +13,13 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.authentication import (
     BaseAuthentication,
-    TokenAuthentication,
+    APIKeyAuthentication,
     BasicAuthentication,
     SessionAuthentication,
     OAuthAuthentication,
     OAuth2Authentication
 )
-from rest_framework.authtoken.models import Token
+from rest_framework.authtoken.models import APIKey
 from rest_framework.compat import oauth2_provider, oauth2_provider_scope
 from rest_framework.compat import oauth, oauth_provider
 from rest_framework.test import APIRequestFactory, APIClient
@@ -48,7 +48,7 @@ urlpatterns = patterns(
     '',
     (r'^session/$', MockView.as_view(authentication_classes=[SessionAuthentication])),
     (r'^basic/$', MockView.as_view(authentication_classes=[BasicAuthentication])),
-    (r'^token/$', MockView.as_view(authentication_classes=[TokenAuthentication])),
+    (r'^token/$', MockView.as_view(authentication_classes=[APIKeyAuthentication])),
     (r'^auth-token/$', 'rest_framework.authtoken.views.obtain_auth_token'),
     (r'^oauth/$', MockView.as_view(authentication_classes=[OAuthAuthentication])),
     (
@@ -142,7 +142,7 @@ class SessionAuthTests(TestCase):
         cf. [#1810](https://github.com/tomchristie/django-rest-framework/pull/1810)
         """
         response = self.csrf_client.get('/auth/login/')
-        self.assertContains(response, '<Label class="span4">Username:</label>')
+        self.assertContains(response, '<label for="id_username">Username:</label>')
 
     def test_post_form_session_auth_failing_csrf(self):
         """
@@ -188,17 +188,17 @@ class TokenAuthTests(TestCase):
         self.user = User.objects.create_user(self.username, self.email, self.password)
 
         self.key = 'abcd1234'
-        self.token = Token.objects.create(key=self.key, user=self.user)
+        self.token = APIKey.objects.create(key=self.key, user=self.user)
 
     def test_post_form_passing_token_auth(self):
         """Ensure POSTing json over token auth with correct credentials passes and does not require CSRF"""
-        auth = 'Token ' + self.key
+        auth = 'APIKey ' + base64.b64encode("%s:%s" % (self.username, self.key))
         response = self.csrf_client.post('/token/', {'example': 'example'}, HTTP_AUTHORIZATION=auth)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_post_json_passing_token_auth(self):
         """Ensure POSTing form over token auth with correct credentials passes and does not require CSRF"""
-        auth = "Token " + self.key
+        auth = 'APIKey ' + base64.b64encode("%s:%s" % (self.username, self.key))
         response = self.csrf_client.post('/token/', {'example': 'example'}, format='json', HTTP_AUTHORIZATION=auth)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
@@ -215,12 +215,12 @@ class TokenAuthTests(TestCase):
     def test_token_has_auto_assigned_key_if_none_provided(self):
         """Ensure creating a token with no key will auto-assign a key"""
         self.token.delete()
-        token = Token.objects.create(user=self.user)
+        token = APIKey.objects.create(user=self.user)
         self.assertTrue(bool(token.key))
 
     def test_generate_key_returns_string(self):
         """Ensure generate_key returns a string"""
-        token = Token()
+        token = APIKey()
         key = token.generate_key()
         self.assertTrue(isinstance(key, six.string_types))
 
@@ -228,31 +228,31 @@ class TokenAuthTests(TestCase):
         """Ensure token login view using JSON POST works."""
         client = APIClient(enforce_csrf_checks=True)
         response = client.post('/auth-token/',
-                               {'username': self.username, 'password': self.password}, format='json')
+                               {'email': self.email, 'password': self.password}, format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data['token'], self.key)
+        self.assertEqual(response.data['apikey'], self.key)
 
     def test_token_login_json_bad_creds(self):
         """Ensure token login view using JSON POST fails if bad credentials are used."""
         client = APIClient(enforce_csrf_checks=True)
         response = client.post('/auth-token/',
-                               {'username': self.username, 'password': "badpass"}, format='json')
+                               {'email': self.email, 'password': "badpass"}, format='json')
         self.assertEqual(response.status_code, 400)
 
     def test_token_login_json_missing_fields(self):
         """Ensure token login view using JSON POST fails if missing fields."""
         client = APIClient(enforce_csrf_checks=True)
         response = client.post('/auth-token/',
-                               {'username': self.username}, format='json')
+                               {'email': self.email}, format='json')
         self.assertEqual(response.status_code, 400)
 
     def test_token_login_form(self):
         """Ensure token login view using form POST works."""
         client = APIClient(enforce_csrf_checks=True)
         response = client.post('/auth-token/',
-                               {'username': self.username, 'password': self.password})
+                               {'email': self.email, 'password': self.password})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data['token'], self.key)
+        self.assertEqual(response.data['apikey'], self.key)
 
 
 class IncorrectCredentialsTests(TestCase):

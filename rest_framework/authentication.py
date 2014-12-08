@@ -2,16 +2,23 @@
 Provides various authentication policies.
 """
 from __future__ import unicode_literals
-import base64
 
+import base64
+import itsdangerous
+
+from calendar import timegm
+from datetime import datetime, timedelta
+from django.conf import settings
 from django.contrib.auth import authenticate
+from django.contrib.auth.models import User
 from django.core.exceptions import ImproperlyConfigured
 from django.middleware.csrf import CsrfViewMiddleware
-from django.conf import settings
+from django.shortcuts import get_object_or_404
+
+from rest_framework.authtoken.models import APIKey
 from rest_framework import exceptions, HTTP_HEADER_ENCODING
 from rest_framework.compat import oauth, oauth_provider, oauth_provider_store
 from rest_framework.compat import oauth2_provider, provider_now, check_nonce
-from rest_framework.authtoken.models import Token
 
 
 def get_authorization_header(request):
@@ -35,7 +42,7 @@ class CSRFCheck(CsrfViewMiddleware):
 
 class BaseAuthentication(object):
     """
-    All authentication classes should extend BaseAuthentication.
+    Abstract base class for an authentication method.
     """
 
     def authenticate(self, request):
@@ -129,12 +136,12 @@ class SessionAuthentication(BaseAuthentication):
         reason = CSRFCheck().process_view(request, None, (), {})
         if reason:
             # CSRF failed, bail with explicit error message
-            raise exceptions.AuthenticationFailed('CSRF Failed: %s' % reason)
+            raise exceptions.PermissionDenied('CSRF Failed: %s' % reason)
 
 
-class TokenAuthentication(BaseAuthentication):
+class APIKeyAuthentication(BaseAuthentication):
     """
-    Simple token based authentication.
+    Simple API Key based authentication.
 
     Clients should authenticate by passing the token key in the "Authorization"
     HTTP header, prepended with the string "Token ".  For example:
@@ -142,42 +149,103 @@ class TokenAuthentication(BaseAuthentication):
         Authorization: Token 401f7ac837da42b97f613d789819ff93537bee6a
     """
 
-    model = Token
+    model = APIKey
     """
-    A custom token model may be used, but must have the following properties.
+    A custom APIKey model may be used, but must have the following properties.
 
     * key -- The string identifying the token
     * user -- The user to which the token belongs
     """
 
     def authenticate(self, request):
+        # import ipdb; ipdb.set_trace()
         auth = get_authorization_header(request).split()
 
-        if not auth or auth[0].lower() != b'token':
+        if not auth or auth[0].lower() != b'apikey':
             return None
 
         if len(auth) == 1:
-            msg = 'Invalid token header. No credentials provided.'
+            msg = 'Invalid API key header. No credentials provided.'
             raise exceptions.AuthenticationFailed(msg)
         elif len(auth) > 2:
-            msg = 'Invalid token header. Token string should not contain spaces.'
+            msg = 'Invalid API key header. API key string should not contain spaces.'
+            raise exceptions.AuthenticationFailed(msg)
+
+        try:
+            auth_parts = base64.b64decode(auth[1]).decode(HTTP_HEADER_ENCODING)
+        except (TypeError, UnicodeDecodeError):
+            msg = 'Invalid apikey header. Credentials not correctly base64 encoded'
+            raise exceptions.AuthenticationFailed(msg)
+
+        username, api_key = auth_parts.split(':')
+        return self.authenticate_credentials(username, api_key)
+
+    def authenticate_credentials(self, username, api_key):
+        try:
+            apikey = self.model.objects.get(key=api_key)
+            if apikey.user.username != username:
+                return exceptions
+        except self.model.DoesNotExist:
+            raise exceptions.AuthenticationFailed('Invalid API key')
+
+        if not apikey.user.is_active:
+            raise exceptions.AuthenticationFailed('User inactive or deleted')
+
+        return (apikey.user, apikey)
+
+    def authenticate_header(self, request):
+        return 'APIKey'
+
+
+class JWTAuthentication(BaseAuthentication):
+
+    iat_skew = timedelta()
+
+    def authenticate(self, request):
+        auth = get_authorization_header(request).split(':', 1)
+
+        if not auth or auth[0].lower() != b'jwt':
+            return None
+
+        if len(auth) == 1:
+            msg = 'Invalid JSON token. No credentials provided.'
+            raise exceptions.AuthenticationFailed(msg)
+        elif len(auth) > 2:
+            msg = 'Invalid JSON token. JWT string should not contain spaces.'
             raise exceptions.AuthenticationFailed(msg)
 
         return self.authenticate_credentials(auth[1])
 
-    def authenticate_credentials(self, key):
+    def authenticate_credentials(self, token):
+        signer = itsdangerous.URLSafeSerializer(settings.SECRET_KEY)
         try:
-            token = self.model.objects.get(key=key)
-        except self.model.DoesNotExist:
-            raise exceptions.AuthenticationFailed('Invalid token')
+            claims = signer.loads(token)
+        except itsdangerous.BadData:
+            msg = 'Invalid JSON token. JWT string should not contain spaces.'
+            raise exceptions.AuthenticationFailed(msg)
+        else:
+            utcnow = datetime.utcnow()
+            now = timegm(utcnow.utctimetuple())
+            if claims['iat'] > timegm((utcnow + self.iat_skew).utctimetuple()):
+                msg = 'Invalid JSON token. JWT is issued in the future'
+                raise exceptions.AuthenticationFailed(msg)
 
-        if not token.user.is_active:
-            raise exceptions.AuthenticationFailed('User inactive or deleted')
+            if claims['nbf'] > now:
+                msg = 'Invalid JSON token. JWT is not yet valid.'
+                raise exceptions.AuthenticationFailed(msg)
 
-        return (token.user, token)
+            if 'exp' in claims and claims['exp'] <= now:
+                msg = 'Invalid JSON token. JWT token is expired.'
+                raise exceptions.AuthenticationFailed(msg)
+
+            user = None
+            if 'user_id' in claims:
+                user = get_object_or_404(User, pk=claims['user_id'])
+
+            return (user, claims)
 
     def authenticate_header(self, request):
-        return 'Token'
+        return "JWT"
 
 
 class OAuthAuthentication(BaseAuthentication):
@@ -267,7 +335,7 @@ class OAuthAuthentication(BaseAuthentication):
     def authenticate_header(self, request):
         """
         If permission is denied, return a '401 Unauthorized' response,
-        with an appropraite 'WWW-Authenticate' header.
+        with an appropriate 'WWW-Authenticate' header.
         """
         return 'OAuth realm="%s"' % self.www_authenticate_realm
 

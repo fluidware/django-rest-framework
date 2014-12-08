@@ -1,11 +1,10 @@
 from django.contrib import admin
-from rest_framework.authtoken.models import Token
+from rest_framework.authtoken.models import APIKey
 
 
-class TokenAdmin(admin.ModelAdmin):
+class APIKeyAdmin(admin.ModelAdmin):
     list_display = ('key', 'user', 'created')
     fields = ('user',)
     ordering = ('-created',)
 
-
-admin.site.register(Token, TokenAdmin)
+admin.site.register(APIKey, APIKeyAdmin)

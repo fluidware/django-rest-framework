@@ -13,17 +13,18 @@ else:
 class Migration(SchemaMigration):
 
     def forwards(self, orm):
-        # Adding model 'Token'
-        db.create_table('authtoken_token', (
+        # Adding model 'APIKey'
+        db.create_table('authtoken_apikey', (
             ('key', self.gf('django.db.models.fields.CharField')(max_length=40, primary_key=True)),
             ('user', self.gf('django.db.models.fields.related.OneToOneField')(related_name='auth_token', unique=True, to=orm['%s.%s' % (User._meta.app_label, User._meta.object_name)])),
             ('created', self.gf('django.db.models.fields.DateTimeField')(auto_now_add=True, blank=True)),
+            ('email', self.gf('django.db.models.fields.CharField')(null=True, blank=True, max_length=255)),
         ))
-        db.send_create_signal('authtoken', ['Token'])
+        db.send_create_signal('authtoken', ['APIKey'])
 
     def backwards(self, orm):
-        # Deleting model 'Token'
-        db.delete_table('authtoken_token')
+        # Deleting model 'APIKey'
+        db.delete_table('authtoken_apikey')
 
     models = {
         'auth.group': {
@@ -43,7 +44,7 @@ class Migration(SchemaMigration):
             'Meta': {'object_name': User._meta.module_name},
         },
         'authtoken.token': {
-            'Meta': {'object_name': 'Token'},
+            'Meta': {'object_name': 'APIKey'},
             'created': ('django.db.models.fields.DateTimeField', [], {'auto_now_add': 'True', 'blank': 'True'}),
             'key': ('django.db.models.fields.CharField', [], {'max_length': '40', 'primary_key': 'True'}),
             'user': ('django.db.models.fields.related.OneToOneField', [], {'related_name': "'auth_token'", 'unique': 'True', 'to': "orm['%s.%s']" % (User._meta.app_label, User._meta.object_name)})
